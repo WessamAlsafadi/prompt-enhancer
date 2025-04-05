@@ -7,12 +7,62 @@ GROQ_API_KEY = "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"
 # Initialize Client
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-# Select Prompt Type
 st.title("⚡ Prompt Enhancer Tool")
-prompt_type = st.selectbox("What are you using the prompt for?", ["", "🖼️ Image Generation", "🎥 Video Prompting", "💬 General Info / Chat"])
 
-# Prompt Input
-user_prompt = st.text_area("📝 Enter your raw idea or prompt:", height=150)
+prompt_type = st.selectbox(
+    "What are you using the prompt for?",
+    ["", "🖼️ Image Generation", "🎥 Video Prompting", "💬 General Info / Chat", "🛍️ E-commerce Product Image"]
+)
+
+user_prompt = ""
+ecom_fields = {}
+
+# E-commerce Dynamic Form
+if prompt_type == "🛍️ E-commerce Product Image":
+    st.subheader("🧱 Product Core")
+    ecom_fields["product"] = st.text_input("What is the product?")
+    ecom_fields["materials"] = st.multiselect("Materials", ["Glass", "Metal", "Fabric", "Plastic", "Leather"])
+    ecom_fields["materials_expand"] = st.text_input("Other materials:")
+    ecom_fields["colors"] = st.text_input("Primary colors (hex or names)")
+    ecom_fields["reference"] = st.radio("Do you have a reference image?", ["Yes", "No"])
+    ecom_fields["reference_expand"] = st.text_input("Describe reference image")
+    ecom_fields["rotation"] = st.selectbox("Product rotation/tilt", ["Static", "Slight Rotation", "Dynamic Twist", "Hovering with Motion Trail"])
+
+    st.subheader("🌍 Background & Environment")
+    ecom_fields["background"] = st.text_input("Background setting (e.g. Tokyo city)")
+    ecom_fields["bg_elements"] = st.multiselect("Background elements", ["Greenery", "Floating Platforms", "Glowing Lines", "Water", "Creatures", "Architecture"])
+    ecom_fields["bg_colors"] = st.text_input("Background colors")
+    ecom_fields["time_of_day"] = st.selectbox("Time of day", ["Morning", "1–2 PM", "Golden Hour", "Dusk", "Night"])
+    ecom_fields["vibe"] = st.selectbox("Environment vibe", ["Peaceful", "Sacred", "Cinematic", "Intense", "Mystical"])
+    ecom_fields["env_effects"] = st.multiselect("Environmental Effects", ["Reflections", "Dust", "Auras", "Light Trails"])
+
+    st.subheader("💡 Lighting & Camera")
+    ecom_fields["lighting"] = st.multiselect("Lighting setup", ["Ambient", "Overhead", "Side Glow", "Backlight", "Dynamic Pulses"])
+    ecom_fields["light_feel"] = st.selectbox("Lighting feel", ["Cinematic", "Soft Natural", "Harsh Contrast", "Ethereal"])
+    ecom_fields["camera"] = st.selectbox("Camera angle", ["Eye-level", "Low-angle", "Wide", "Close-up", "Top-down"])
+    ecom_fields["realism"] = st.slider("Realism Level (%)", 0, 100, 100)
+
+    st.subheader("🧊 Texture & Detail Focus")
+    ecom_fields["textures"] = st.multiselect("Material textures", ["Brushed Metal", "Glowing Edges", "Leather Grain"])
+    ecom_fields["shadows"] = st.multiselect("Reflections/Shadows", ["Sharp Shadows", "Soft Glow", "Mirror Floor", "Natural Surface"])
+
+    st.subheader("🧍 Composition & Branding")
+    ecom_fields["collection"] = st.radio("Product display", ["Solo", "Collection"])
+    ecom_fields["text_space"] = st.radio("Leave space for text?", ["Yes", "No"])
+    ecom_fields["fade_behind"] = st.radio("Fade/blur background behind text?", ["Yes", "No"])
+    ecom_fields["logo"] = st.selectbox("Logo placement", ["On Product", "Floating", "Background"])
+    ecom_fields["symbol"] = st.radio("Embed brand symbol subtly?", ["Yes", "No"])
+
+    st.subheader("🎯 Purpose, Feel, CTA")
+    ecom_fields["platform"] = st.selectbox("Platform", ["Instagram Post", "Story", "Facebook Ad", "Banner", "Print"])
+    ecom_fields["goal"] = st.selectbox("Image Goal", ["Branding", "Showcase", "Ad / Conversion", "Creative"])
+    ecom_fields["emotion"] = st.multiselect("Emotion", ["Luxury", "Rebellion", "Peace", "Confidence", "Curiosity"])
+    ecom_fields["branding"] = st.text_input("Brand messaging (e.g. Minimalism, Innovation)")
+    ecom_fields["narrative"] = st.text_input("Narrative moment?")
+    ecom_fields["cta"] = st.selectbox("CTA", ["Shop Now", "Try It Today", "Discover More", "Join the Movement", "No CTA"])
+
+else:
+    user_prompt = st.text_area("📝 Enter your raw idea or prompt:", height=150)
 
 # System Prompts
 image_system = """Role & Purpose  
@@ -114,14 +164,24 @@ Even if informal, the output should still be grammatically correct, direct, and 
 Respond only with the enhanced prompt. Do not add explanations or extra commentary.
 """
 
-# Mapping system prompt based on choice
+ecommerce_system = """You are an expert in cinematic product imagery. Based on the detailed creative brief, write a stunning and clean prompt for AI image generation (like Midjourney or DALL-E). Focus on describing the product appearance, background, lighting, camera style, emotion, and branding clearly. Return only the final prompt."""
+
 system_prompt_map = {
     "🖼️ Image Generation": image_system,
     "🎥 Video Prompting": video_system,
-    "💬 General Info / Chat": general_system
+    "💬 General Info / Chat": general_system,
+    "🛍️ E-commerce Product Image": ecommerce_system
 }
 
-# Generate Response
+# Helper: format E-commerce prompt
+def build_ecommerce_text(data):
+    lines = []
+    for k, v in data.items():
+        val = ", ".join(v) if isinstance(v, list) else v
+        lines.append(f"{k.replace('_', ' ').capitalize()}: {val}")
+    return "\n".join(lines)
+
+# Response Generator
 def generate_response(user_input, system_prompt):
     messages = [
         {"role": "system", "content": system_prompt},
@@ -134,31 +194,34 @@ def generate_response(user_input, system_prompt):
     )
     return completion.choices[0].message.content
 
-# Only allow if all fields are filled
+# Button
 if st.button("✨ Enhance Prompt"):
-    if not prompt_type or not user_prompt.strip():
-        st.warning("Please select a prompt type and enter your prompt.")
+    if not prompt_type:
+        st.warning("Please select a prompt type.")
+    elif prompt_type == "🛍️ E-commerce Product Image":
+        structured_input = build_ecommerce_text(ecom_fields)
+        result = generate_response(structured_input, ecommerce_system)
+    elif not user_prompt.strip():
+        st.warning("Please enter a prompt.")
     else:
         system_prompt = system_prompt_map[prompt_type]
         result = generate_response(user_prompt, system_prompt)
 
+    if 'result' in locals():
         st.subheader("🔧 Enhanced Prompt")
         st.code(result, language="markdown")
 
-        # Export Buttons (appear only after prompt is generated)
-        st.subheader("📤 Export Prompt")
-
         col1, col2, col3 = st.columns(3)
-
         with col1:
-            st.code(f"/imagine prompt: {result} --v 5 --style raw", language="markdown")
-            st.button("Copy Midjourney Prompt")  # Optional: add clipboard.js later
-
+            st.code(f"/imagine prompt: {result} --v 5 --style raw")
         with col2:
-            st.code(result, language="markdown")
-            st.button("Copy for Ideogram/Leonardo")
-
+            st.code(result)
         with col3:
-            st.download_button("💾 Download Prompt as .txt", result, file_name="enhanced_prompt.txt")
+            st.download_button("💾 Download Prompt", result, file_name="prompt.txt")
 
 
+
+###################################################################################################333
+#############################################################################################3
+##################################################################################3
+####################################################################################
